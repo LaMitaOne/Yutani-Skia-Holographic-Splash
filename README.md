@@ -23,3 +23,6 @@ uses  Yutani.SkiaIntro;// Example: Start immediatelyvar Intro := TYutaniSkiaIntr
 Sample Project Included    
    
 The repository includes a sample project demonstrating how to use the component. The sample allows you to type custom text and select a custom PNG file via an TOpenDialog to instantly preview the intro with your own assets.    
+
+part of Yutani Engine     
+https://github.com/LaMitaOne/Yutani-Building-better-worlds      
