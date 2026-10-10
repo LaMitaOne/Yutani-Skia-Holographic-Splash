@@ -18,7 +18,8 @@ Usage
    
 Just instantiate the class, pass your logo path and text, and set AAutoStart to True.         
    
-uses  Yutani.SkiaIntro;// Example: Start immediatelyvar Intro := TYutaniSkiaIntro.Create('C:\path\to\logo.png', 'MY APP', True);    
+uses  Yutani.SkiaIntro;// Example: Start immediately      
+var Intro := TYutaniSkiaIntro.Create('C:\path\to\logo.png', 'MY APP', True);    
      
 Sample Project Included    
    
