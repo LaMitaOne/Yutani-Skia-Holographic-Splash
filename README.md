@@ -4,8 +4,14 @@ A universal, threaded, and high-performance startup intro component for Delphi V
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/LaMitaOne/Yutani-Skia-Holographic-Splash)    
      
 <img width="272" height="303" alt="Unbenannt" src="https://github.com/user-attachments/assets/4596fef6-ed66-410e-a22c-737af6014f49" />
-       
-It renders a transparent, click-through overlay window and spawns a dynamic stream of particles that rain down from the top of the screen to seamlessly form a provided PNG logo and text. It features aggressive micro-hovering, holographic flicker, and a final glowing pulse before fading out smoothly.     
+     
+https://github.com/user-attachments/assets/e99f414b-ce83-4349-b447-e27283b1f07e
+    
+It renders a transparent, click-through overlay window and spawns a dynamic stream of particles that rain down from the top of the screen to seamlessly form a provided PNG logo and text. It features aggressive micro-hovering, holographic 
+
+
+
+flicker, and a final glowing pulse before fading out smoothly.     
       
 Features      
     
