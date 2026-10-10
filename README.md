@@ -1,4 +1,4 @@
-# Yutani-Skia-Holographic-Splash
+# Yutani-Skia-Holographic-Splash v0.1
 A universal, threaded, and high-performance startup intro component for Delphi VCL applications, powered by Skia4Delphi.     
     
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/LaMitaOne/Yutani-Skia-Holographic-Splash)    
