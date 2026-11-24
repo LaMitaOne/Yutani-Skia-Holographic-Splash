@@ -1,7 +1,7 @@
 unit Yutani.SkiaIntro;
 
 {==============================================================================*
- *  Yutani Skia Intro v0.1 - Holographic Particle Stream Startup (Universal)
+ *  Yutani Skia Intro v0.2 - Holographic Particle Stream Startup (Universal)
  *------------------------------------------------------------------------------
  *  Author : Lara Miriam Tamy Reschke / LamitaOne
  *
@@ -13,20 +13,27 @@ unit Yutani.SkiaIntro;
  *
  *  Usage:
  *    var Intro := TYutaniSkiaIntro.Create('C:\mylogo.png', 'MY APP', True);
- *==============================================================================}
 
+  Latest Changes:
+   v 0.2:
+   - Replaced PNG stream encoding with direct SkImageToBitmap (BGRA8888 + Premul)
+     for zero-overhead DirtyRect UpdateLayeredWindow rendering.
+   v 0.1:
+   - Initial release 
+ *==============================================================================}
 interface
 
 uses
   Winapi.Windows, Winapi.MMSystem, System.SysUtils, System.Classes, System.Types,
   System.UITypes, System.Math, System.SyncObjs, System.Diagnostics,
   System.Generics.Collections, System.Generics.Defaults, Vcl.Forms, Vcl.Graphics,
-  Vcl.Imaging.pngimage, Skia;
+  Vcl.Imaging.pngimage, Skia, Vcl.Skia;
 
 type
   { Defines the current phase of the intro animation }
   TIntroState = (isIdle, isFadeIn, isParticlesForm, isTextGlow, isFadeOut, isFinished);
   { High Precision Timer based on TStopwatch (QPC on Windows) }
+
   THighResTimer = record
     Frequency: Int64;
     procedure Init;
@@ -34,14 +41,15 @@ type
     procedure HybridWaitUntil(const ATargetTicks, ASpinNanoseconds: Int64);
   end;
   { Represents a single particle used to form the hologram text }
+
   TParticle = record
     Pos, Vel, Target: TPointF;
     LifeTime: Double;
     ReachedTarget: Boolean;
   end;
-
   { TYutaniSkiaIntro }
   { A threaded, high-performance Skia-based intro renderer. }
+
   TYutaniSkiaIntro = class
   private
     FForm: TForm;
@@ -62,12 +70,10 @@ type
     FScanY: Single;
     FMinY: Single;
     FMaxY: Single;
-
     // Universal Properties
     FLogoPath: string;
     FTextString: string;
     FAutoStart: Boolean;
-
     procedure MakeClickThroughFullScreen;
     procedure UpdateIntroWindow;
     procedure GenerateParticleTargets;
@@ -85,7 +91,6 @@ type
     procedure Start;
     procedure Stop;
     function IntroFinished: Boolean;
-
     property LogoPath: string read FLogoPath write SetLogoPath;
     property TextString: string read FTextString write SetTextString;
   end;
@@ -96,7 +101,6 @@ const
   { Busy-spin window: while less than this remains until the frame deadline,
     we spin instead of sleeping. }
   SPIN_THRESHOLD_NS = 2000000; // 2 ms
-
 {==============================================================================
   THighResTimer Implementation
 ==============================================================================}
@@ -127,7 +131,6 @@ begin
   while GetTicks < ATargetTicks do
     ;
 end;
-
 {==============================================================================
   TYutaniSkiaIntro Implementation
 ==============================================================================}
@@ -148,34 +151,28 @@ begin
   FForm.Left := (Screen.Width - LogoSize) div 2;
   FForm.Top := (Screen.Height - LogoSize) div 2;
   MakeClickThroughFullScreen;
-
   { Setup the internal 32-bit bitmap buffer used for LayeredWindow updates }
   FBuffer := TBitmap.Create;
   FBuffer.PixelFormat := pf32bit;
   FBuffer.AlphaFormat := afDefined;
   FBuffer.SetSize(LogoSize, LogoSize);
-
   // Default values if nothing is passed
   ExePath := ExtractFilePath(ParamStr(0));
   if ALogoPath <> '' then
     FLogoPath := ALogoPath
   else
     FLogoPath := ExePath + 'ressources\yutani_logo.png';
-
   if ATextString <> '' then
     FTextString := ATextString
   else
     FTextString := 'YUTANI';
-
   { Load the main logo image directly into ISkImage }
   if FileExists(FLogoPath) then
     FLogoImage := TSkImage.MakeFromEncodedFile(FLogoPath)
   else
     FLogoImage := nil;
-
   FLock := TCriticalSection.Create;
   GenerateParticleTargets;
-
   if AAutoStart then
     Start;
 end;
@@ -245,7 +242,6 @@ begin
       TempLogoBmp.Canvas.Brush.Color := clBlack;
       TempLogoBmp.Canvas.FillRect(Rect(0, 0, LogoSize, LogoSize));
       TempLogoBmp.Canvas.StretchDraw(Rect(0, 0, LogoSize, LogoSize), PngImage);
-
       for y := 0 to TempLogoBmp.Height - 1 do
       begin
         for x := 0 to TempLogoBmp.Width - 1 do
@@ -263,7 +259,6 @@ begin
         end;
       end;
     end;
-
     // --- Rasterize the text into particle targets ---
     TempBmp.SetSize(350, 120);
     TempBmp.Canvas.Brush.Color := clBlack;
@@ -278,7 +273,6 @@ begin
     { Calculate the target area for the text at the bottom of the window }
     FTextBounds := TRectF.Create((FBuffer.Width - TxtWidth) / 2, FBuffer.Height - TxtHeight - 30, (FBuffer.Width + TxtWidth) / 2, FBuffer.Height - 30);
     TempBmp.Canvas.TextOut((TempBmp.Width - TxtWidth) div 2, 0, FTextString);
-
     { Rasterize the text into points. Using modulo 4 creates gaps,
       giving it a dotted hologram appearance. }
     for y := 0 to TempBmp.Height - 1 do
@@ -291,7 +285,6 @@ begin
         end;
       end;
     end;
-
     // Sort targets strictly by Y, then X to ensure a uniform top-to-bottom build
     TmpTargetList.Sort(TComparer<TPointF>.Construct(
       function(const Left, Right: TPointF): Integer
@@ -303,7 +296,6 @@ begin
         else
           Result := 1;
       end));
-
     // Find vertical bounds for the scanline logic
     FMinY := 10000;
     FMaxY := 0;
@@ -314,13 +306,11 @@ begin
       if TmpTargetList[x].y > FMaxY then
         FMaxY := TmpTargetList[x].y;
     end;
-
     // --- Assign targets and particles arrays ---
     SetLength(FTargetPoints, TmpTargetList.Count);
     SetLength(FParticles, TmpTargetList.Count);
     for x := 0 to TmpTargetList.Count - 1 do
       FTargetPoints[x] := TmpTargetList[x];
-
   finally
     TmpTargetList.Free;
     TempBmp.Free;
@@ -358,7 +348,6 @@ begin
   // Advance scanline to control the uniform top-to-bottom formation
   ScanSpeed := (FMaxY - FMinY + 50) / BUILD_TIME;
   FScanY := FScanY + ScanSpeed * DeltaTime;
-
   { Spawn particles continuously from the top }
   while (FNextTargetIdx < Length(FParticles)) and (FTargetPoints[FNextTargetIdx].y <= FScanY) do
   begin
@@ -370,7 +359,6 @@ begin
     FParticles[FNextTargetIdx].ReachedTarget := False;
     Inc(FNextTargetIdx);
   end;
-
   { Update active particles }
   for I := 0 to FNextTargetIdx - 1 do
   begin
@@ -385,7 +373,6 @@ begin
       FParticles[I].Pos := FParticles[I].Pos + (FParticles[I].Vel * DeltaTime);
       Continue;
     end;
-
     FParticles[I].LifeTime := FParticles[I].LifeTime + DeltaTime;
     { Safety mechanism: Force particles to their target after 3.5 seconds
       to guarantee the animation can proceed to the glow state. }
@@ -428,15 +415,12 @@ begin
   Paint := TSkPaint.Create;
   Paint.AntiAlias := True;
   Paint.Style := TSkPaintStyle.Fill;
-
   { Glow Paint for the blurred aura }
   GlowPaint := TSkPaint.Create;
   GlowPaint.AntiAlias := True;
   GlowPaint.Style := TSkPaintStyle.Fill;
-
   BaseColor := $FF00BFFF; // Dark Sci-Fi Cyan
   GlowColor := $FF66FFFF; // Bright Cyan/White for the glow aura
-
   for I := 0 to FNextTargetIdx - 1 do
   begin
     if FParticles[I].LifeTime < 0 then
@@ -444,23 +428,18 @@ begin
     LifeFactor := FParticles[I].LifeTime / 0.3;
     if LifeFactor > 1.0 then
       LifeFactor := 1.0;
-
     if FParticles[I].ReachedTarget then
       PAlpha := 0.8
     else
       PAlpha := 0.4 * LifeFactor;
-
     // Calculate an individual phase offset for organic breathing
     PhaseOffset := FGlobalTime * 4.0 + (I * 0.05);
-
     // Simulate holographic interference and neon flicker
     Flicker := 0.85 + (Sin(FGlobalTime * 15.0 + I * 1.3) * 0.1);
     Flicker := Flicker + (Sin(FGlobalTime * 33.0 + I * 2.7) * 0.05); // Higher frequency noise
     Flicker := EnsureRange(Flicker, 0.6, 1.1); // Clamp to avoid blackout
-
     BlurRadius := (5.0 + (Sin(PhaseOffset) * 2.0)) * Flicker;
     Size := 1.5 + (Sin(PhaseOffset) * 0.2);
-
     if (FState = isTextGlow) and FParticles[I].ReachedTarget then
     begin
       BlurRadius := BlurRadius + (8.0 * FGlowStrength);
@@ -480,19 +459,16 @@ begin
       GlowPaint.Alpha := EnsureRange(Round(FinalAlpha * 0.9), 0, 255);
       Paint.Alpha := EnsureRange(Round(FinalAlpha), 0, 255);
     end;
-
     { Draw the blurred glow aura first }
     if BlurRadius > 0.1 then
     begin
       GlowPaint.ImageFilter := TSkImageFilter.MakeBlur(BlurRadius, BlurRadius);
       ACanvas.DrawCircle(FParticles[I].Pos, Size * 1.5, GlowPaint);
     end;
-
     { Draw the solid bright core on top }
     Paint.ImageFilter := nil;
     ACanvas.DrawCircle(FParticles[I].Pos, Size, Paint);
   end;
-
   { Reset filters to avoid affecting other drawings }
   Paint.ImageFilter := nil;
   GlowPaint.ImageFilter := nil;
@@ -500,8 +476,8 @@ end;
 
 procedure TYutaniSkiaIntro.Start;
 begin
-  if FState <> isIdle then Exit;
-
+  if FState <> isIdle then
+    Exit;
   InitParticles;
   FState := isFadeIn;
   FStateTimer := 0;
@@ -552,7 +528,6 @@ begin
             DeltaSec := 1 / 60;
           FStateTimer := FStateTimer + DeltaSec;
           FGlobalTime := FGlobalTime + DeltaSec; // Increment global continuous time
-
           { 1. LOGIC STATE MACHINE }
           case FState of
             isFadeIn:
@@ -616,7 +591,6 @@ begin
                 end;
               end;
           end;
-
           { 2. RENDERING (Queue to Main Thread) }
           TThread.Queue(nil,
             procedure
@@ -624,9 +598,8 @@ begin
               if Assigned(FForm) and FForm.Visible then
                 RenderFrame;
             end);
-
           { 3. FRAME PACING }
-              FrameTicks := Round(Freq / 60);
+          FrameTicks := Round(Freq / 60);
           NextFrame := NextFrame + FrameTicks;
           NowTicks := Timer.GetTicks;
           if NextFrame <= NowTicks then
@@ -661,12 +634,10 @@ var
   Surface: ISkSurface;
   Canvas: ISkCanvas;
   SkImage: ISkImage;
-  MemStream: TMemoryStream;
-  PngImage: TPngImage;
   Paint: ISkPaint;
 begin
-  { Create an offscreen Skia surface for drawing }
-  ImgInfo := TSkImageInfo.Create(FBuffer.Width, FBuffer.Height);
+  { Create an offscreen Skia surface for drawing (explizit BGRA8888 + Premul) }
+  ImgInfo := TSkImageInfo.Create(FBuffer.Width, FBuffer.Height, TSkColorType.BGRA8888, TSkAlphaType.Premul);
   Surface := TSkSurface.MakeRaster(ImgInfo);
   if not Assigned(Surface) then
     Exit;
@@ -676,42 +647,15 @@ begin
   Paint.AntiAlias := True;
   Paint.Alpha := Round(255 * FAlpha);
 
-  { The logo is now formed by particles, so static drawing is skipped
-    to allow the particle formation effect to be fully visible. }
-
   { Draw the particle system }
   RenderParticles(Canvas);
 
-  { Export the Skia surface to a PNG stream and draw it onto the Windows bitmap }
+  { Export the Skia surface directly to the Windows bitmap }
   SkImage := Surface.MakeImageSnapshot;
   if Assigned(SkImage) then
   begin
-    MemStream := TMemoryStream.Create;
-    try
-      if SkImage.EncodeToStream(MemStream, TSkEncodedImageFormat.PNG) then
-      begin
-        if MemStream.Size > 0 then
-        begin
-          MemStream.Position := 0;
-          PngImage := TPngImage.Create;
-          try
-            PngImage.LoadFromStream(MemStream);
-            FBuffer.Canvas.Lock;
-            try
-              FBuffer.Canvas.Brush.Color := clBlack;
-              FBuffer.Canvas.FillRect(Rect(0, 0, FBuffer.Width, FBuffer.Height));
-              FBuffer.Canvas.Draw(0, 0, PngImage);
-            finally
-              FBuffer.Canvas.Unlock;
-            end;
-          finally
-            PngImage.Free;
-          end;
-        end;
-      end;
-    finally
-      MemStream.Free;
-    end;
+    FBuffer.Free;
+    FBuffer := SkImageToBitmap(SkImage);
     UpdateIntroWindow;
   end;
 end;
@@ -756,3 +700,4 @@ begin
 end;
 
 end.
+
